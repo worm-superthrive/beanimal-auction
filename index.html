@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeAnimal Auction</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #FAF6F1;
+        }
+        .timer-box {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 text-center">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">BeAnimal Hostel, Happiness Cafe and Pudducakes Auction</h1>
+            <p class="text-gray-600">Place your bid to acquire this thriving business opportunity</p>
+        </div>
+
+        <!-- Timer -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <p id="auctionStatus" class="text-center text-lg mb-4"></p>
+            <div class="grid grid-cols-4 gap-4">
+                <div class="timer-box">
+                    <span id="days" class="text-2xl font-bold">00</span>
+                    <p class="text-sm text-gray-600">Days</p>
+                </div>
+                <div class="timer-box">
+                    <span id="hours" class="text-2xl font-bold">00</span>
+                    <p class="text-sm text-gray-600">Hours</p>
+                </div>
+                <div class="timer-box">
+                    <span id="minutes" class="text-2xl font-bold">00</span>
+                    <p class="text-sm text-gray-600">Minutes</p>
+                </div>
+                <div class="timer-box">
+                    <span id="seconds" class="text-2xl font-bold">00</span>
+                    <p class="text-sm text-gray-600">Seconds</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="text-sm text-gray-600">Current Bid</div>
+                <div id="currentBid" class="text-xl font-bold">₹30,00,000</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="text-sm text-gray-600">Active Bidders</div>
+                <div id="activeBidders" class="text-xl font-bold">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="text-sm text-gray-600">Total Bids</div>
+                <div id="totalBids" class="text-xl font-bold">0</div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="bg-gray-200 rounded-full h-4 mb-2">
+                <div id="progressBar" class="bg-green-600 rounded-full h-4 progress-bar" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600">
+                <span>₹30,00,000</span>
+                <span>₹1,00,00,000</span>
+            </div>
+        </div>
+
+        <!-- Bid Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Place Your Bid</h2>
+            <form id="bidForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bid Amount (₹)</label>
+                        <input type="number" name="amount" required min="3000000" step="50000" 
+                            class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="Enter amount in ₹">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                        <input type="text" name="name" required
+                            class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="Enter your full name">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" name="phone" required pattern="[6-9][0-9]{9}"
+                            class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="10-digit mobile number">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email (Optional)</label>
+                        <input type="email" name="email"
+                            class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="Enter your email">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="notifications" name="notifications" class="rounded text-green-600">
+                    <label for="notifications" class="text-sm text-gray-700">Notify me when I'm outbid</label>
+                </div>
+                <button type="submit" id="submitButton" 
+                    class="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                    Place Bid
+                </button>
+            </form>
+        </div>
+
+        <!-- Messages -->
+        <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"></div>
+        <div id="successMessage" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4"></div>
+
+        <!-- Bid History -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-4">Bid History</h2>
+            <div id="bidHistory" class="space-y-3">
+                <!-- Bids will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const AUCTION_START_DATE = new Date('2024-11-29T10:00:00');
+        const AUCTION_END_DATE = new Date('2024-12-06T18:00:00');
+        const MIN_BID = 3000000; // 30 lakhs
+        const MAX_BID = 10000000; // 1 crore
+        const BID_INCREMENT = 50000;
+
+        // Initialize IndexedDB
+        const db = new Dexie('AuctionDB');
+        db.version(1).stores({
+            bids: '++id, amount, name, phone, email, timestamp'
+        });
+
+        // Initialize page
+        let currentHighestBid = MIN_BID;
+        updateStats();
+        startTimer();
+        loadBidHistory();
+
+        // Timer function
+        function startTimer() {
+            function updateTimer() {
+                const now = new Date();
+                let targetDate, status;
+
+                if (now < AUCTION_START_DATE) {
+                    targetDate = AUCTION_START_DATE;
+                    status = "Auction starts in:";
+                } else if (now < AUCTION_END_DATE) {
+                    targetDate = AUCTION_END_DATE;
+                    status = "Time remaining:";
+                } else {
+                    document.getElementById('auctionStatus').textContent = "Auction has ended";
+                    disableBidding();
+                    return;
+                }
+
+                const distance = targetDate.getTime() - now.getTime();
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                document.getElementById('auctionStatus').textContent = status;
+                document.getElementById('days').textContent = String(days).padStart(2, '0');
+                document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+                document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+                document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+            }
+
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }
+
+        // Handle bid submission
+        document.getElementById('bidForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const now = new Date();
+            if (now < AUCTION_START_DATE) {
+                showError("Auction hasn't started yet");
+                return;
+            }
+            if (now > AUCTION_END_DATE) {
+                showError("Auction has ended");
+                return;
+            }
+
+            const formData = new FormData(e.target);
+            const bidAmount = Number(formData.get('amount'));
+
+            // Validate bid
+            if (bidAmount <= currentHighestBid) {
+                showError(`Bid must be higher than ₹${currentHighestBid.toLocaleString('en-IN')}`);
+                return;
+            }
+            if (bidAmount % BID_INCREMENT !== 0) {
+                showError(`Bid must be in increments of ₹${BID_INCREMENT.toLocaleString('en-IN')}`);
+                return;
+            }
+
+            try {
+                await db.bids.add({
+                    amount: bidAmount,
+                    name: formData.get('name'),
+                    phone: formData.get('phone'),
+                    email: formData.get('email'),
+                    timestamp: new Date()
+                });
+
+                currentHighestBid = bidAmount;
+                updateStats();
+                loadBidHistory();
+                e.target.reset();
+                showSuccess('Bid placed successfully!');
+            } catch (error) {
+                showError('Error placing bid. Please try again.');
+                console.error(error);
+            }
+        });
+
+        // Update statistics
+        async function updateStats() {
+            const allBids = await db.bids.toArray();
+            const uniqueBidders = new Set(allBids.map(bid => bid.phone)).size;
+            
+            document.getElementById('currentBid').textContent = `₹${currentHighestBid.toLocaleString('en-IN')}`;
+            document.getElementById('activeBidders').textContent = uniqueBidders;
+            document.getElementById('totalBids').textContent = allBids.length;
+            
+            // Update progress bar
+            const progress = Math.min(((currentHighestBid - MIN_BID) / (MAX_BID - MIN_BID)) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        // Load bid history
+        async function loadBidHistory() {
+            const bids = await db.bids.orderBy('timestamp').reverse().toArray();
+            const historyContainer = document.getElementById('bidHistory');
+            historyContainer.innerHTML = bids.map(bid => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <div class="font-medium text-gray-800">${bid.name}</div>
+                    <div class="font-bold text-green-600">₹${bid.amount.toLocaleString('en-IN')}</div>
+                    <div class="text-sm text-gray-600">${new Date(bid.timestamp).toLocaleString()}</div>
+                </div>
+            `).join('');
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.classList.remove('hidden');
+            setTimeout(() => successDiv.classList.add('hidden'), 5000);
+        }
+
+        function disableBidding() {
+            document.getElementById('bidForm').querySelectorAll('input, button').forEach(element => {
+                element.disabled = true;
+            });
+            document.getElementById('submitButton').textContent = 'Auction Ended';
+        }
+    </script>
+</body>
+</html>
