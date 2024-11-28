@@ -143,6 +143,95 @@
         const MAX_BID = 10000000; // 1 crore
         const BID_INCREMENT = 50000;
 
+        ```javascript
+// Admin settings
+const ADMIN_PASSWORDS = ['admin123']; // Change this to your desired password
+let isAdmin = false;
+
+// Add admin login UI
+const adminUI = `
+  <div id="adminLogin" class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-bold mb-4">Admin Login</h2>
+    <div class="flex gap-2">
+      <input type="password" id="adminPassword" class="p-2 border rounded flex-grow" placeholder="Admin password">
+      <button onclick="loginAdmin()" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+    </div>
+  </div>
+  
+  <div id="adminPanel" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+    <h2 class="text-xl font-bold mb-4">Pending Bids</h2>
+    <div id="pendingBids" class="space-y-3"></div>
+  </div>
+`;
+
+document.querySelector('.max-w-4xl').insertAdjacentHTML('afterbegin', adminUI);
+
+// Add these functions:
+function loginAdmin() {
+    const password = document.getElementById('adminPassword').value;
+    if (ADMIN_PASSWORDS.includes(password)) {
+        isAdmin = true;
+        document.getElementById('adminLogin').classList.add('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
+        loadPendingBids();
+    } else {
+        showError('Invalid admin password');
+    }
+}
+
+// Modify the db initialization:
+db.version(1).stores({
+    bids: '++id, amount, name, phone, email, timestamp, status',
+    pendingBids: '++id, amount, name, phone, email, timestamp'
+});
+
+// Update bid submission:
+async function submitBid(bidData) {
+    await db.pendingBids.add(bidData);
+    showSuccess('Bid submitted for approval');
+    loadPendingBids();
+}
+
+async function loadPendingBids() {
+    if (!isAdmin) return;
+    
+    const pendingBids = await db.pendingBids.toArray();
+    const container = document.getElementById('pendingBids');
+    
+    container.innerHTML = pendingBids.map(bid => `
+        <div class="border p-4 rounded">
+            <div class="flex justify-between mb-2">
+                <span>₹${bid.amount.toLocaleString('en-IN')}</span>
+                <span>${bid.name}</span>
+                <span>${new Date(bid.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="approveBid(${bid.id})" class="bg-green-600 text-white px-3 py-1 rounded">
+                    Approve
+                </button>
+                <button onclick="rejectBid(${bid.id})" class="bg-red-600 text-white px-3 py-1 rounded">
+                    Reject
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function approveBid(bidId) {
+    const bid = await db.pendingBids.get(bidId);
+    await db.bids.add({...bid, status: 'approved'});
+    await db.pendingBids.delete(bidId);
+    currentHighestBid = bid.amount;
+    updateStats();
+    loadBidHistory();
+    loadPendingBids();
+}
+
+async function rejectBid(bidId) {
+    await db.pendingBids.delete(bidId);
+    loadPendingBids();
+}
+
         // Initialize IndexedDB
         const db = new Dexie('AuctionDB');
         db.version(1).stores({
