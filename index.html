@@ -25,6 +25,20 @@
 </head>
 <body class="p-4">
     <div class="max-w-4xl mx-auto">
+        <!-- Admin Section -->
+        <div id="adminLogin" class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Admin Login</h2>
+            <div class="flex gap-2">
+                <input type="password" id="adminPassword" class="p-2 border rounded flex-grow" placeholder="Admin password">
+                <button onclick="loginAdmin()" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+            </div>
+        </div>
+
+        <div id="adminPanel" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4">Pending Bids</h2>
+            <div id="pendingBids" class="space-y-3"></div>
+        </div>
+
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 text-center">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">BeAnimal Hostel, Happiness Cafe and Pudducakes Auction</h1>
@@ -33,7 +47,7 @@
 
         <!-- Timer -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <p id="auctionStatus" class="text-center text-lg mb-4"></p>
+            <p id="auctionStatus" class="text-center text-lg mb-4 font-bold">Time Left to Bid:</p>
             <div class="grid grid-cols-4 gap-4">
                 <div class="timer-box">
                     <span id="days" class="text-2xl font-bold">00</span>
@@ -137,105 +151,21 @@
 
     <script>
         // Constants
-        const AUCTION_START_DATE = new Date('2024-11-27T00:00:00');
+        const AUCTION_START_DATE = new Date(); // Starting now
         const AUCTION_END_DATE = new Date('2024-12-06T18:00:00');
         const MIN_BID = 3000000; // 30 lakhs
         const MAX_BID = 10000000; // 1 crore
         const BID_INCREMENT = 50000;
+        const ADMIN_PASSWORD = 'admin123'; // Change this to your desired password
 
-        ```javascript
-// Admin settings
-const ADMIN_PASSWORDS = ['admin123']; // Change this to your desired password
-let isAdmin = false;
-
-// Add admin login UI
-const adminUI = `
-  <div id="adminLogin" class="bg-white rounded-lg shadow-md p-6 mb-6">
-    <h2 class="text-xl font-bold mb-4">Admin Login</h2>
-    <div class="flex gap-2">
-      <input type="password" id="adminPassword" class="p-2 border rounded flex-grow" placeholder="Admin password">
-      <button onclick="loginAdmin()" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
-    </div>
-  </div>
-  
-  <div id="adminPanel" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
-    <h2 class="text-xl font-bold mb-4">Pending Bids</h2>
-    <div id="pendingBids" class="space-y-3"></div>
-  </div>
-`;
-
-document.querySelector('.max-w-4xl').insertAdjacentHTML('afterbegin', adminUI);
-
-// Add these functions:
-function loginAdmin() {
-    const password = document.getElementById('adminPassword').value;
-    if (ADMIN_PASSWORDS.includes(password)) {
-        isAdmin = true;
-        document.getElementById('adminLogin').classList.add('hidden');
-        document.getElementById('adminPanel').classList.remove('hidden');
-        loadPendingBids();
-    } else {
-        showError('Invalid admin password');
-    }
-}
-
-// Modify the db initialization:
-db.version(1).stores({
-    bids: '++id, amount, name, phone, email, timestamp, status',
-    pendingBids: '++id, amount, name, phone, email, timestamp'
-});
-
-// Update bid submission:
-async function submitBid(bidData) {
-    await db.pendingBids.add(bidData);
-    showSuccess('Bid submitted for approval');
-    loadPendingBids();
-}
-
-async function loadPendingBids() {
-    if (!isAdmin) return;
-    
-    const pendingBids = await db.pendingBids.toArray();
-    const container = document.getElementById('pendingBids');
-    
-    container.innerHTML = pendingBids.map(bid => `
-        <div class="border p-4 rounded">
-            <div class="flex justify-between mb-2">
-                <span>₹${bid.amount.toLocaleString('en-IN')}</span>
-                <span>${bid.name}</span>
-                <span>${new Date(bid.timestamp).toLocaleString()}</span>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="approveBid(${bid.id})" class="bg-green-600 text-white px-3 py-1 rounded">
-                    Approve
-                </button>
-                <button onclick="rejectBid(${bid.id})" class="bg-red-600 text-white px-3 py-1 rounded">
-                    Reject
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function approveBid(bidId) {
-    const bid = await db.pendingBids.get(bidId);
-    await db.bids.add({...bid, status: 'approved'});
-    await db.pendingBids.delete(bidId);
-    currentHighestBid = bid.amount;
-    updateStats();
-    loadBidHistory();
-    loadPendingBids();
-}
-
-async function rejectBid(bidId) {
-    await db.pendingBids.delete(bidId);
-    loadPendingBids();
-}
+        // Admin state
+        let isAdmin = false;
 
         // Initialize IndexedDB
         const db = new Dexie('AuctionDB');
         db.version(1).stores({
-            bids: '++id, amount, name, phone, email, timestamp'
+            bids: '++id, amount, name, phone, email, timestamp, status',
+            pendingBids: '++id, amount, name, phone, email, timestamp'
         });
 
         // Initialize page
@@ -244,31 +174,36 @@ async function rejectBid(bidId) {
         startTimer();
         loadBidHistory();
 
+        // Admin login
+        function loginAdmin() {
+            const password = document.getElementById('adminPassword').value;
+            if (password === ADMIN_PASSWORD) {
+                isAdmin = true;
+                document.getElementById('adminLogin').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                loadPendingBids();
+            } else {
+                showError('Invalid admin password');
+            }
+        }
+
         // Timer function
         function startTimer() {
             function updateTimer() {
                 const now = new Date();
-                let targetDate, status;
+                const distance = AUCTION_END_DATE.getTime() - now.getTime();
 
-                if (now < AUCTION_START_DATE) {
-                    targetDate = AUCTION_START_DATE;
-                    status = "Auction starts in:";
-                } else if (now < AUCTION_END_DATE) {
-                    targetDate = AUCTION_END_DATE;
-                    status = "Time remaining:";
-                } else {
+                if (distance <= 0) {
                     document.getElementById('auctionStatus').textContent = "Auction has ended";
                     disableBidding();
                     return;
                 }
 
-                const distance = targetDate.getTime() - now.getTime();
                 const days = Math.floor(distance / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-                document.getElementById('auctionStatus').textContent = status;
                 document.getElementById('days').textContent = String(days).padStart(2, '0');
                 document.getElementById('hours').textContent = String(hours).padStart(2, '0');
                 document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
@@ -284,10 +219,6 @@ async function rejectBid(bidId) {
             e.preventDefault();
             
             const now = new Date();
-            if (now < AUCTION_START_DATE) {
-                showError("Auction hasn't started yet");
-                return;
-            }
             if (now > AUCTION_END_DATE) {
                 showError("Auction has ended");
                 return;
@@ -307,24 +238,66 @@ async function rejectBid(bidId) {
             }
 
             try {
-                await db.bids.add({
+                const bidData = {
                     amount: bidAmount,
                     name: formData.get('name'),
                     phone: formData.get('phone'),
                     email: formData.get('email'),
                     timestamp: new Date()
-                });
+                };
 
-                currentHighestBid = bidAmount;
-                updateStats();
-                loadBidHistory();
+                await db.pendingBids.add(bidData);
+                showSuccess('Bid submitted for approval');
+                loadPendingBids();
                 e.target.reset();
-                showSuccess('Bid placed successfully!');
             } catch (error) {
                 showError('Error placing bid. Please try again.');
                 console.error(error);
             }
         });
+
+        // Admin functions
+        async function loadPendingBids() {
+            if (!isAdmin) return;
+            
+            const pendingBids = await db.pendingBids.toArray();
+            const container = document.getElementById('pendingBids');
+            
+            container.innerHTML = pendingBids.map(bid => `
+                <div class="border p-4 rounded">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-bold">₹${bid.amount.toLocaleString('en-IN')}</span>
+                        <span>${bid.name}</span>
+                        <span>${new Date(bid.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="approveBid(${bid.id})" class="bg-green-600 text-white px-3 py-1 rounded">
+                            Approve
+                        </button>
+                        <button onclick="rejectBid(${bid.id})" class="bg-red-600 text-white px-3 py-1 rounded">
+                            Reject
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function approveBid(bidId) {
+            const bid = await db.pendingBids.get(bidId);
+            await db.bids.add({...bid, status: 'approved'});
+            await db.pendingBids.delete(bidId);
+            if (bid.amount > currentHighestBid) {
+                currentHighestBid = bid.amount;
+            }
+            updateStats();
+            loadBidHistory();
+            loadPendingBids();
+        }
+
+        async function rejectBid(bidId) {
+            await db.pendingBids.delete(bidId);
+            loadPendingBids();
+        }
 
         // Update statistics
         async function updateStats() {
@@ -343,36 +316,3 @@ async function rejectBid(bidId) {
         // Load bid history
         async function loadBidHistory() {
             const bids = await db.bids.orderBy('timestamp').reverse().toArray();
-            const historyContainer = document.getElementById('bidHistory');
-            historyContainer.innerHTML = bids.map(bid => `
-                <div class="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <div class="font-medium text-gray-800">${bid.name}</div>
-                    <div class="font-bold text-green-600">₹${bid.amount.toLocaleString('en-IN')}</div>
-                    <div class="text-sm text-gray-600">${new Date(bid.timestamp).toLocaleString()}</div>
-                </div>
-            `).join('');
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-        }
-
-        function showSuccess(message) {
-            const successDiv = document.getElementById('successMessage');
-            successDiv.textContent = message;
-            successDiv.classList.remove('hidden');
-            setTimeout(() => successDiv.classList.add('hidden'), 5000);
-        }
-
-        function disableBidding() {
-            document.getElementById('bidForm').querySelectorAll('input, button').forEach(element => {
-                element.disabled = true;
-            });
-            document.getElementById('submitButton').textContent = 'Auction Ended';
-        }
-    </script>
-</body>
-</html>
